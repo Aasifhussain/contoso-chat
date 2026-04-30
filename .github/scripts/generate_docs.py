@@ -6,8 +6,8 @@ from openai import OpenAI
 
 # ── Config ────────────────────────────────────────────────────────────────────
 client        = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-DOCS_TOKEN    = os.environ["DOCS_REPO_TOKEN"]
-DOCS_REPO     = os.environ["DOCS_REPO"]          # e.g. "your-org/product-docs"
+DOCS_TOKEN    = os.environ["DOCS_REPO_TOKEN"].strip()
+DOCS_REPO     = os.environ["DOCS_REPO"].strip()          # e.g. "your-org/product-docs"
 DOCS_REPO_URL = f"https://x:{DOCS_TOKEN}@github.com/{DOCS_REPO}.git"
 DOCS_DIR      = Path("_cloned_docs")             # local clone target
 MODEL         = "gpt-5-nano"
@@ -116,7 +116,7 @@ def main():
     readme   = read_readme()
     openapi  = read_openapi()
 
-    print("Generating docs with GPT-4o-mini...")
+    print(f"Generating docs with {MODEL}...")
     results = {
         "guides/overview.mdx":   gen_overview(src),
         "quickstart.mdx":        gen_quickstart(readme) if readme else None,
@@ -127,6 +127,9 @@ def main():
 
     print(f"Cloning {DOCS_REPO}...")
     git(["clone", DOCS_REPO_URL, str(DOCS_DIR)])
+
+    # ── Fix: ensure push uses the PAT, not cached personal credentials ────────
+    git(["remote", "set-url", "origin", DOCS_REPO_URL], cwd=DOCS_DIR)
 
     changed = False
     for rel_path, content in results.items():
@@ -148,9 +151,9 @@ def main():
         print("Nothing changed — skipping commit.")
         return
 
-    git(["add", "."],                                         cwd=DOCS_DIR)
+    git(["add", "."],                                             cwd=DOCS_DIR)
     git(["commit", "-m", "docs: AI-generated update [skip ci]"], cwd=DOCS_DIR)
-    git(["push"],                                             cwd=DOCS_DIR)
+    git(["push"],                                                 cwd=DOCS_DIR)
     print("Pushed to docs repo. Mintlify will auto-deploy.")
 
 if __name__ == "__main__":
